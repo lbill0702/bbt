@@ -1,6 +1,6 @@
 
 <!DOCTYPE html>
-<!-- VERSION: 4.0-SELF-CONTAINED -->
+<!-- VERSION: 6.0-SIMPLEST -->
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
@@ -29,8 +29,7 @@
   .ticker-up{color:var(--green);}
   .ticker-down{color:var(--red);}
   .main{padding:28px 40px;max-width:1600px;margin:0 auto;}
-  .phase{display:none;}
-  .phase.active{display:block;}
+  /* phases shown/hidden by JS only */
   .card{background:var(--panel);border:1px solid var(--border);border-radius:2px;padding:22px;}
   .card-title{font-family:'Bebas Neue';font-size:17px;letter-spacing:3px;color:var(--gold);margin-bottom:18px;display:flex;align-items:center;gap:10px;}
   .card-title::before{content:'';width:4px;height:17px;background:var(--gold);display:block;}
@@ -237,7 +236,7 @@
 <div class="main">
 
 <!-- LOBBY (QR Code page) -->
-<div id="phase-lobby" style="display:none">
+<div id="phase-lobby">
   <div style="max-width:560px;margin:0 auto;padding:30px 18px">
 
     <!-- Single QR code card -->
@@ -282,7 +281,7 @@
 </div>
 
 <!-- PLAYER SELF-REGISTRATION -->
-<div id="phase-player-register" style="display:none">
+<div id="phase-player-register">
   <div style="max-width:480px;margin:40px auto;padding:0 18px">
     <div class="card">
       <div class="card-title">玩家登記</div>
@@ -553,6 +552,7 @@
       <button class="btn btn-outline btn-sm" onclick="closeModal('swap-modal')">取消</button>
       <button class="btn btn-sm" id="swap-confirm-btn" onclick="executeSwap()"
         style="background:linear-gradient(135deg,var(--
+<script
 <script>
 const PRODUCTS=[
   {id:'savings',   name:'穩健儲蓄',icon:'🏦',color:'#4080E8'},
@@ -1745,6 +1745,9 @@ function showView(){
 }
 
 function initByRole(){
+    // Remove the CSS phase-hide block so JS can control visibility
+    var phHide=document.getElementById('phase-hide');
+    if(phHide)phHide.parentNode.removeChild(phHide);
   // Show correct view immediately
   try{
     ['phase-setup','phase-lobby','phase-player-register','phase-gameplay','phase-leaderboard'].forEach(function(id){
@@ -2008,6 +2011,7 @@ function applyRoleUI(){
 console.log("慾望快車 v2.0-NOSPINNER loaded");
 initByRole();
 applyRoleUI();
+
 </script>
 </body>
 </html>
