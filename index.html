@@ -1,5 +1,6 @@
+
 <!DOCTYPE html>
-<!-- VERSION: 3.0-NOSPINNER-FINAL -->
+<!-- VERSION: 4.0-SELF-CONTAINED -->
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
@@ -586,6 +587,18 @@ function emptyRoundData(){return{extraExpense:0,_extraUsed:false,trades:{},dice:
             p.has('player')||h.startsWith('player')?'player':
             p.has('join')||h==='join'?'join':'lobby';
   var pIdx=(role==='player')?parseInt(p.get('player')||h.replace('player=','')||'0'):null;
+  window.__ROLE=role;
+  window.__PLAYER_IDX=isNaN(pIdx)?null:pIdx;
+})();
+// Detect role directly from URL — self-contained, no dependency on inline script
+(function(){
+  var p=new URLSearchParams(location.search);
+  var h=(location.hash||'').replace('#','');
+  var isAdmin=p.has('admin')||h==='admin';
+  var isJoin=p.has('join')||h==='join';
+  var isPlayer=p.has('player')||h.startsWith('player');
+  var role=isAdmin?'admin':isPlayer?'player':isJoin?'join':'lobby';
+  var pIdx=isPlayer?parseInt(p.get('player')||h.replace('player=','')||'0'):null;
   window.__ROLE=role;
   window.__PLAYER_IDX=isNaN(pIdx)?null:pIdx;
 })();
