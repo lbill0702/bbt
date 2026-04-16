@@ -1,6 +1,6 @@
 
 <!DOCTYPE html>
-<!-- VERSION: 2.0-NOSPINNER -->
+<!-- VERSION: 3.0-NOSPINNER-FINAL -->
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
@@ -29,8 +29,8 @@
   .ticker-up{color:var(--green);}
   .ticker-down{color:var(--red);}
   .main{padding:28px 40px;max-width:1600px;margin:0 auto;}
-  .phase{display:none !important;}
-  .phase.active{display:block !important;}
+  .phase{display:none;}
+  .phase.active{display:block;}
   .card{background:var(--panel);border:1px solid var(--border);border-radius:2px;padding:22px;}
   .card-title{font-family:'Bebas Neue';font-size:17px;letter-spacing:3px;color:var(--gold);margin-bottom:18px;display:flex;align-items:center;gap:10px;}
   .card-title::before{content:'';width:4px;height:17px;background:var(--gold);display:block;}
@@ -168,11 +168,7 @@
   /* Mobile blink fix: avoid GPU-compositing issues */
   *{-webkit-tap-highlight-color:transparent;}
   .phase{display:none !important;}  /* all phases hidden until JS shows them */
-  .phase.active{display:block !important;}
-  @keyframes spin{to{transform:rotate(360deg)}}
-  #startup-spinner{position:fixed;inset:0;background:#0A0A0A;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999;gap:16px;}
-  #startup-spinner svg circle:last-child{animation:spin 1s linear infinite;transform-origin:24px 24px;}
-  body{-webkit-font-smoothing:antialiased;}
+  .phase.active{display:block !important;}}  body{-webkit-font-smoothing:antialiased;}
   /* Disable heavy animations on mobile */
   @media(max-width:768px){
     *{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.1ms!important;}
@@ -187,13 +183,6 @@
 </head>
 <body style="background:#0A0A0A">
 
-<!-- Spinner rendered immediately — no JS needed, no black flash -->
-<div id="startup-spinner">
-  <svg width="52" height="52" viewBox="0 0 48 48">
-    <circle cx="24" cy="24" r="20" fill="none" stroke="#2A2A3E" stroke-width="4"/>
-    <circle cx="24" cy="24" r="20" fill="none" stroke="#C8A84B" stroke-width="4" stroke-dasharray="30 96" stroke-linecap="round"/>
-  </svg>
-  <div id="spinner-msg" style="font-family:DM Mono,monospace;font-size:13px;color:#8888AA">連接資料庫…</div>
 </div>
 
 <!-- Role detection runs SYNCHRONOUSLY before any content is painted -->
@@ -650,8 +639,6 @@ function loadState(cb){
   // Hard timeout — always proceed after 4s even if Firebase never responds
   var timer=setTimeout(function(){
     console.warn('loadState timeout — proceeding without data');
-    var sp=document.getElementById('spinner-msg');
-    if(sp)sp.textContent='離線模式';
     finish(false);
   }, 4000);
 
@@ -677,11 +664,8 @@ function loadState(cb){
     .catch(function(e){
       clearTimeout(timer);
       console.warn('loadState error:', e.message||e);
-      var sp=document.getElementById('spinner-msg');
-      if(sp)sp.innerHTML='Firebase 連線失敗 — 請設定資料庫規則';
       var n=document.getElementById('firebase-notice');
       if(n)n.style.display='block';
-      // Proceed immediately — don't leave user on spinner
       finish(false);
     });
 }
@@ -1689,10 +1673,6 @@ function setInsurance(isY){
 
 
 // ── ROLE INITIALISATION ────────────────────────────────────────────────
-function hideSpinner(){
-  var sp=document.getElementById('startup-spinner');
-  if(sp)sp.style.display='none';
-}
 
 function showView(){
   // Show the correct view based on role — called immediately, no Firebase needed
@@ -1753,17 +1733,57 @@ function showView(){
 }
 
 function initByRole(){
-  // Hide spinner & show UI immediately — zero network dependency
-  try{ hideSpinner(); }catch(e){}
-  try{ showView(); }catch(e){ console.warn('showView:',e.message); }
-  // Fetch Firebase in background after UI is already visible
+  // Show correct view immediately
+  try{
+    ['phase-setup','phase-lobby','phase-player-register','phase-gameplay','phase-leaderboard'].forEach(function(id){
+      var el=document.getElementById(id);
+      if(el&&el.classList){el.classList.remove('active');el.style.display='none';}
+    });
+    function show(id,cls){
+      var el=document.getElementById(id);
+      if(!el)return;
+      el.style.display='block';
+      if(cls)el.classList.add('active');
+    }
+    var anyDone=roundData.some(function(rd){return rd&&rd[0]&&rd[0]._done;});
+    if(IS_LOBBY){
+      show('phase-lobby');
+      document.querySelectorAll('.phase-btn').forEach(function(b){b.style.display='none';});
+      try{renderLobbyQR();}catch(e){}
+      try{renderLobbyPlayerList();}catch(e){}
+    } else if(IS_JOIN){
+      document.querySelectorAll('.phase-btn').forEach(function(b){b.style.display='none';});
+      show('phase-player-register');
+    } else if(IS_PLAYER){
+      document.querySelectorAll('.phase-btn').forEach(function(b){b.style.display='none';});
+      var me=players[MY_PLAYER_IDX];
+      if(!me||!me.name){ show('phase-player-register'); }
+      else{ show('phase-gameplay',true); try{renderGameplay();}catch(e){} }
+      try{updateMarketTicker();}catch(e){}
+    } else if(IS_ADMIN){
+      var badge=document.createElement('span');
+      badge.style.cssText='font-family:DM Mono,monospace;font-size:11px;background:rgba(200,168,75,.15);border:1px solid var(--gold);color:var(--gold);padding:4px 10px;letter-spacing:2px;margin-right:8px';
+      badge.textContent='ADMIN';
+      var pi=document.querySelector('.phase-indicator');
+      if(pi&&!document.querySelector('.admin-badge')){badge.className='admin-badge';pi.prepend(badge);}
+      if(anyDone){ show('phase-gameplay',true); try{renderGameplay();}catch(e){}; }
+      else{ show('phase-setup',true); try{renderPlayerList();}catch(e){}; }
+      try{updateMarketTicker();}catch(e){}
+    } else {
+      show('phase-setup',true);
+      try{renderPlayerList();}catch(e){}
+      try{updateMarketTicker();}catch(e){}
+    }
+  }catch(e){ console.warn('initByRole error:',e.message); }
+
+  // Firebase in background — never blocks UI
   startPolling();
   setTimeout(function(){
     loadState(function(ok){
-      if(ok) try{ refreshUI(); }catch(e){}
-      updateDebugBar();
+      if(ok) try{refreshUI();}catch(e){}
+      try{updateDebugBar();}catch(e){}
     });
-  }, 500);
+  },500);
 }
 // ── LOBBY QR CODE ─────────────────────────────────────────────────────
 function getJoinUrl(){
