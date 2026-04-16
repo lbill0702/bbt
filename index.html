@@ -1,13 +1,10 @@
 
 <!DOCTYPE html>
-<!-- VERSION: 6.0-SIMPLEST -->
+<!-- VER:8.0 -->
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
 <title>慾望快車 — 投資人生遊戲</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600;700;900&family=Bebas+Neue&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -24,13 +21,13 @@
   .phase-btn.active{background:var(--gold);color:#000;border-color:var(--gold);font-weight:700;}
   .phase-btn:hover:not(.active){border-color:var(--gold);color:var(--gold);}
   .phase-indicator{display:flex;gap:6px;}
+  .phase{display:none;}
+  .phase.active{display:block;}
   .market-ticker{background:var(--panel2);border-top:1px solid var(--border);padding:7px 40px;display:flex;gap:28px;overflow:hidden;white-space:nowrap;}
   .ticker-item{display:flex;align-items:center;gap:7px;font-family:'DM Mono';font-size:11px;color:var(--text-dim);flex-shrink:0;}
   .ticker-up{color:var(--green);}
   .ticker-down{color:var(--red);}
-  .main{padding:28px 40px;max-width:1600px;margin:0 auto;}
-  /* phases shown/hidden by JS only */
-  .card{background:var(--panel);border:1px solid var(--border);border-radius:2px;padding:22px;}
+  .main{padding:28px 40px;max-width:1600px;margin:0 auto;}  .card{background:var(--panel);border:1px solid var(--border);border-radius:2px;padding:22px;}
   .card-title{font-family:'Bebas Neue';font-size:17px;letter-spacing:3px;color:var(--gold);margin-bottom:18px;display:flex;align-items:center;gap:10px;}
   .card-title::before{content:'';width:4px;height:17px;background:var(--gold);display:block;}
   .btn{padding:10px 22px;border:none;cursor:pointer;font-family:'Noto Serif TC';font-size:14px;font-weight:700;letter-spacing:1px;transition:all .2s;border-radius:1px;}
@@ -165,9 +162,7 @@
   ::-webkit-scrollbar-thumb{background:var(--border);}
   ::-webkit-scrollbar-thumb:hover{background:var(--gold-dark);}
   /* Mobile blink fix: avoid GPU-compositing issues */
-  *{-webkit-tap-highlight-color:transparent;}
-  .phase{display:none !important;}  /* all phases hidden until JS shows them */
-  .phase.active{display:block !important;}}  body{-webkit-font-smoothing:antialiased;}
+  *{-webkit-tap-highlight-color:transparent;}/* all phases hidden until JS shows them */  body{-webkit-font-smoothing:antialiased;}
   /* Disable heavy animations on mobile */
   @media(max-width:768px){
     *{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.1ms!important;}
@@ -182,6 +177,7 @@
 </head>
 <body style="background:#0A0A0A">
 
+<!-- Spinner rendered immediately — no JS needed, no black flash -->
 </div>
 
 <!-- Role detection runs SYNCHRONOUSLY before any content is painted -->
@@ -242,6 +238,7 @@
     <!-- Single QR code card -->
     <div class="card" style="text-align:center;padding:40px 32px">
       <div class="card-title" style="justify-content:center;margin-bottom:6px">慾望快車</div>
+      <div id="ver-display" style="font-family:DM Mono,monospace;font-size:10px;color:#444;margin-bottom:4px">v8.0</div>
       <div style="font-size:13px;color:var(--text-dim);margin-bottom:28px;font-family:DM Mono,monospace;letter-spacing:1px">
         掃描以下 QR Code 加入遊戲
       </div>
@@ -552,8 +549,8 @@
       <button class="btn btn-outline btn-sm" onclick="closeModal('swap-modal')">取消</button>
       <button class="btn btn-sm" id="swap-confirm-btn" onclick="executeSwap()"
         style="background:linear-gradient(135deg,var(--
-<script
-<script>
+<script>console.log("=== 慾望快車 JS START ===");
+
 const PRODUCTS=[
   {id:'savings',   name:'穩健儲蓄',icon:'🏦',color:'#4080E8'},
   {id:'bluechip',  name:'藍籌股',  icon:'📊',color:'#40C87A'},
@@ -579,18 +576,6 @@ let roundData=[];
 function emptyRoundData(){return{extraExpense:0,_extraUsed:false,trades:{},dice:null};}
 
 // ── ROLE CONSTANTS ───────────────────────────────────────────────────
-// Detect role from URL directly (no dependency on inline script)
-(function(){
-  var p=new URLSearchParams(location.search);
-  var h=(location.hash||'').replace('#','');
-  var role=p.has('admin')||h==='admin'?'admin':
-            p.has('player')||h.startsWith('player')?'player':
-            p.has('join')||h==='join'?'join':'lobby';
-  var pIdx=(role==='player')?parseInt(p.get('player')||h.replace('player=','')||'0'):null;
-  window.__ROLE=role;
-  window.__PLAYER_IDX=isNaN(pIdx)?null:pIdx;
-})();
-// Detect role directly from URL — self-contained, no dependency on inline script
 (function(){
   var p=new URLSearchParams(location.search);
   var h=(location.hash||'').replace('#','');
@@ -602,7 +587,7 @@ function emptyRoundData(){return{extraExpense:0,_extraUsed:false,trades:{},dice:
   window.__ROLE=role;
   window.__PLAYER_IDX=isNaN(pIdx)?null:pIdx;
 })();
-const ROLE=window.__ROLE;
+const ROLE=window.__ROLE||'lobby';
 const MY_PLAYER_IDX=window.__PLAYER_IDX;
 const IS_ADMIN=ROLE==='admin';
 const IS_PLAYER=ROLE==='player';
@@ -651,6 +636,8 @@ function loadState(cb){
   // Hard timeout — always proceed after 4s even if Firebase never responds
   var timer=setTimeout(function(){
     console.warn('loadState timeout — proceeding without data');
+    var sp=document.getElementById('spinner-msg');
+    if(sp)sp.textContent='離線模式';
     finish(false);
   }, 4000);
 
@@ -676,8 +663,11 @@ function loadState(cb){
     .catch(function(e){
       clearTimeout(timer);
       console.warn('loadState error:', e.message||e);
+      var sp=document.getElementById('spinner-msg');
+      if(sp)sp.innerHTML='Firebase 連線失敗 — 請設定資料庫規則';
       var n=document.getElementById('firebase-notice');
       if(n)n.style.display='block';
+      // Proceed immediately — don't leave user on spinner
       finish(false);
     });
 }
@@ -1685,7 +1675,6 @@ function setInsurance(isY){
 
 
 // ── ROLE INITIALISATION ────────────────────────────────────────────────
-
 function showView(){
   // Show the correct view based on role — called immediately, no Firebase needed
   var anyDone=roundData.some(function(rd){return rd&&rd[0]&&rd[0]._done;});
@@ -1745,60 +1734,54 @@ function showView(){
 }
 
 function initByRole(){
-    // Remove the CSS phase-hide block so JS can control visibility
-    var phHide=document.getElementById('phase-hide');
-    if(phHide)phHide.parentNode.removeChild(phHide);
-  // Show correct view immediately
-  try{
-    ['phase-setup','phase-lobby','phase-player-register','phase-gameplay','phase-leaderboard'].forEach(function(id){
-      var el=document.getElementById(id);
-      if(el&&el.classList){el.classList.remove('active');el.style.display='none';}
-    });
-    function show(id,cls){
-      var el=document.getElementById(id);
-      if(!el)return;
-      el.style.display='block';
-      if(cls)el.classList.add('active');
-    }
-    var anyDone=roundData.some(function(rd){return rd&&rd[0]&&rd[0]._done;});
-    if(IS_LOBBY){
-      show('phase-lobby');
-      document.querySelectorAll('.phase-btn').forEach(function(b){b.style.display='none';});
-      try{renderLobbyQR();}catch(e){}
-      try{renderLobbyPlayerList();}catch(e){}
-    } else if(IS_JOIN){
-      document.querySelectorAll('.phase-btn').forEach(function(b){b.style.display='none';});
-      show('phase-player-register');
-    } else if(IS_PLAYER){
-      document.querySelectorAll('.phase-btn').forEach(function(b){b.style.display='none';});
-      var me=players[MY_PLAYER_IDX];
-      if(!me||!me.name){ show('phase-player-register'); }
-      else{ show('phase-gameplay',true); try{renderGameplay();}catch(e){} }
-      try{updateMarketTicker();}catch(e){}
-    } else if(IS_ADMIN){
-      var badge=document.createElement('span');
-      badge.style.cssText='font-family:DM Mono,monospace;font-size:11px;background:rgba(200,168,75,.15);border:1px solid var(--gold);color:var(--gold);padding:4px 10px;letter-spacing:2px;margin-right:8px';
-      badge.textContent='ADMIN';
-      var pi=document.querySelector('.phase-indicator');
-      if(pi&&!document.querySelector('.admin-badge')){badge.className='admin-badge';pi.prepend(badge);}
-      if(anyDone){ show('phase-gameplay',true); try{renderGameplay();}catch(e){}; }
-      else{ show('phase-setup',true); try{renderPlayerList();}catch(e){}; }
-      try{updateMarketTicker();}catch(e){}
-    } else {
-      show('phase-setup',true);
-      try{renderPlayerList();}catch(e){}
-      try{updateMarketTicker();}catch(e){}
-    }
-  }catch(e){ console.warn('initByRole error:',e.message); }
-
-  // Firebase in background — never blocks UI
+  ['phase-setup','phase-lobby','phase-player-register','phase-gameplay','phase-leaderboard'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el){el.style.display='none';if(el.classList)el.classList.remove('active');}
+  });
+  function show(id,act){
+    var el=document.getElementById(id);
+    if(!el)return;
+    el.style.display='block';
+    if(act&&el.classList)el.classList.add('active');
+  }
+  var anyDone=roundData.some(function(rd){return rd&&rd[0]&&rd[0]._done;});
+  if(IS_LOBBY){
+    show('phase-lobby');
+    document.querySelectorAll('.phase-btn').forEach(function(b){b.style.display='none';});
+    try{renderLobbyQR();}catch(e){}
+    try{renderLobbyPlayerList();}catch(e){}
+  }else if(IS_JOIN){
+    document.querySelectorAll('.phase-btn').forEach(function(b){b.style.display='none';});
+    show('phase-player-register');
+    try{updateMarketTicker();}catch(e){}
+  }else if(IS_PLAYER){
+    document.querySelectorAll('.phase-btn').forEach(function(b){b.style.display='none';});
+    var me=players[MY_PLAYER_IDX];
+    if(!me||!me.name){show('phase-player-register');}
+    else{show('phase-gameplay',true);try{renderGameplay();}catch(e){}}
+    try{updateMarketTicker();}catch(e){}
+  }else if(IS_ADMIN){
+    var ab=document.createElement('span');
+    ab.style.cssText='font-family:DM Mono,monospace;font-size:11px;background:rgba(200,168,75,.15);border:1px solid var(--gold);color:var(--gold);padding:4px 10px;letter-spacing:2px;margin-right:8px';
+    ab.textContent='ADMIN';ab.className='admin-badge';
+    var pi=document.querySelector('.phase-indicator');
+    if(pi&&!document.querySelector('.admin-badge'))pi.prepend(ab);
+    if(anyDone){show('phase-gameplay',true);try{renderGameplay();}catch(e){};}
+    else{show('phase-setup',true);try{renderPlayerList();}catch(e){};}
+    try{updateMarketTicker();}catch(e){}
+  }else{
+    show('phase-setup',true);
+    try{renderPlayerList();}catch(e){}
+    try{updateMarketTicker();}catch(e){}
+  }
   startPolling();
   setTimeout(function(){
     loadState(function(ok){
-      if(ok) try{refreshUI();}catch(e){}
+      if(ok)try{refreshUI();}catch(e){}
       try{updateDebugBar();}catch(e){}
     });
   },500);
+  console.log("=== initByRole done, ROLE="+ROLE);
 }
 // ── LOBBY QR CODE ─────────────────────────────────────────────────────
 function getJoinUrl(){
@@ -2008,10 +1991,8 @@ function applyRoleUI(){
 }
 
 // Initialise based on URL role
-console.log("慾望快車 v2.0-NOSPINNER loaded");
 initByRole();
 applyRoleUI();
-
 </script>
 </body>
 </html>
